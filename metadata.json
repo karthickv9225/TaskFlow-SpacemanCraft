@@ -1,0 +1,6 @@
+{
+  "name": "Company Task Management System",
+  "description": "Company Task Management System (TaskFlow) with role-based Admin and Employee dashboards powered by Firebase Authentication and Cloud Firestore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,386 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && userDocExists() && userDoc().status == 'Active';
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'karthick.contact.in@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (isActiveUser() && userDoc().role == 'admin');
+    }
+
+    function isValidWorkspaceMeta(data) {
+      return data.keys().hasAll(['adminInitialized', 'createdAt'])
+        && data.keys().hasOnly(['adminInitialized', 'createdAt'])
+        && data.adminInitialized is bool
+        && data.adminInitialized == true
+        && data.createdAt is timestamp;
+    }
+
+    function isValidUser(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'employeeId', 'name', 'email', 'role',
+          'department', 'designation', 'joiningDate', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'employeeId', 'name', 'email', 'role',
+          'department', 'designation', 'joiningDate', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.employeeId is string && data.employeeId.size() >= 1 && data.employeeId.size() <= 32
+        && data.employeeId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.role in ['admin', 'employee']
+        && data.department is string && data.department.size() >= 1 && data.department.size() <= 80
+        && data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 80
+        && data.joiningDate is string && data.joiningDate.size() == 10
+        && data.joiningDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.status in ['Active', 'Inactive']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll([
+          'taskCode', 'title', 'description', 'assignedTo', 'assignedToName',
+          'assignedEmployeeCode', 'createdBy', 'priority', 'status',
+          'startDate', 'dueDate', 'progress', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'taskCode', 'title', 'description', 'assignedTo', 'assignedToName',
+          'assignedEmployeeCode', 'createdBy', 'priority', 'status',
+          'startDate', 'dueDate', 'progress', 'createdAt', 'updatedAt'
+        ])
+        && data.taskCode is string && data.taskCode.size() >= 1 && data.taskCode.size() <= 32
+        && data.taskCode.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 4000
+        && data.assignedTo is string && data.assignedTo.size() <= 128
+        && (data.assignedTo == '' || isValidId(data.assignedTo))
+        && data.assignedToName is string && data.assignedToName.size() <= 100
+        && data.assignedEmployeeCode is string && data.assignedEmployeeCode.size() <= 32
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.priority in ['Low', 'Medium', 'High']
+        && data.status in ['To Do', 'In Progress', 'Review', 'Blocked', 'Completed']
+        && data.startDate is string && data.startDate.size() == 10
+        && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.dueDate is string && data.dueDate.size() == 10
+        && data.dueDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.dueDate >= data.startDate
+        && (data.progress is int || data.progress is float)
+        && data.progress >= 0 && data.progress <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTaskComment(data, taskId) {
+      return data.keys().hasAll(['taskId', 'authorId', 'authorName', 'authorRole', 'message', 'createdAt'])
+        && data.keys().hasOnly(['taskId', 'authorId', 'authorName', 'authorRole', 'message', 'createdAt'])
+        && data.taskId is string && data.taskId == taskId && isValidId(data.taskId)
+        && data.authorId is string && data.authorId == request.auth.uid && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100
+        && data.authorRole in ['admin', 'employee']
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 2000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll([
+          'recipientId', 'taskId', 'title', 'message', 'type', 'read', 'actorId', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'recipientId', 'taskId', 'title', 'message', 'type', 'read', 'actorId', 'createdAt'
+        ])
+        && data.recipientId is string && isValidId(data.recipientId)
+        && data.taskId is string && data.taskId.size() <= 128
+        && (data.taskId == '' || isValidId(data.taskId))
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 500
+        && data.type in ['task_assigned', 'task_updated', 'task_comment', 'status_changed']
+        && data.read is bool
+        && data.actorId is string && data.actorId == request.auth.uid && isValidId(data.actorId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidTaskActivity(data) {
+      return data.keys().hasAll([
+          'taskId', 'assignedTo', 'taskOwnerId', 'actorId', 'actorName', 'action', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'taskId', 'assignedTo', 'taskOwnerId', 'actorId', 'actorName', 'action', 'createdAt'
+        ])
+        && data.taskId is string && isValidId(data.taskId)
+        && data.assignedTo is string && data.assignedTo.size() <= 128
+        && (data.assignedTo == '' || isValidId(data.assignedTo))
+        && data.taskOwnerId is string && isValidId(data.taskOwnerId)
+        && data.actorId is string && data.actorId == request.auth.uid && isValidId(data.actorId)
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 100
+        && data.action is string && data.action.size() >= 1 && data.action.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    // Singleton workspace initialization lock (non-PII)
+    match /meta/{docId} {
+      allow get: if docId == 'workspace';
+      allow create: if isSignedIn()
+        && docId == 'workspace'
+        && isValidWorkspaceMeta(incoming())
+        && !exists(/databases/$(database)/documents/meta/workspace)
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // User profiles & RBAC directory (PII isolated to owner or admin)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && isValidUser(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          // Existing admin provisioning an employee account
+          (isAdmin() && incoming().role == 'employee')
+          // One-time initial admin bootstrap (atomic with /meta/workspace creation)
+          || (
+            isOwner(userId)
+            && incoming().role == 'admin'
+            && incoming().status == 'Active'
+            && !exists(/databases/$(database)/documents/meta/workspace)
+            && existsAfter(/databases/$(database)/documents/meta/workspace)
+          )
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && isValidUser(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Admin updates employee profile/status
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'email', 'department', 'designation', 'joiningDate', 'status', 'updatedAt'
+            ])
+          )
+          // Action: Active user updates own display name
+          || (
+            isOwner(userId)
+            && isActiveUser()
+            && incoming().role == existing().role
+            && incoming().status == existing().status
+            && incoming().email == existing().email
+            && incoming().employeeId == existing().employeeId
+            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(userId) && isAdmin() && userId != request.auth.uid;
+    }
+
+    // Company Tasks
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && isValidId(taskId) && (existing().assignedTo == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.assignedTo == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && isAdmin()
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (incoming().assignedTo == '' || exists(/databases/$(database)/documents/users/$(incoming().assignedTo)));
+
+      allow update: if isSignedIn()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().taskCode == existing().taskCode
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Admin full edit / reassign / state override
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'assignedTo', 'assignedToName',
+              'assignedEmployeeCode', 'priority', 'status',
+              'startDate', 'dueDate', 'progress', 'updatedAt'
+            ])
+            && (incoming().assignedTo == '' || exists(/databases/$(database)/documents/users/$(incoming().assignedTo)))
+          )
+          // Action: Assigned active employee updates status & progress (terminal 'Completed' state locked for employees)
+          || (
+            isActiveUser()
+            && existing().assignedTo == request.auth.uid
+            && existing().status != 'Completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'progress', 'updatedAt'])
+          )
+          // Action: Assigned active employee touches updatedAt when posting a comment
+          || (
+            isActiveUser()
+            && existing().assignedTo == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt'])
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(taskId) && isAdmin();
+
+      // Subcollection: Task Comments (Master Gate via parent task)
+      match /comments/{commentId} {
+        allow get: if isSignedIn()
+          && isValidId(taskId)
+          && isValidId(commentId)
+          && (
+            isAdmin()
+            || (isActiveUser() && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedTo == request.auth.uid)
+          );
+        allow list: if isSignedIn()
+          && isValidId(taskId)
+          && (
+            isAdmin()
+            || (isActiveUser() && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedTo == request.auth.uid)
+          );
+        allow create: if isSignedIn()
+          && isValidId(taskId)
+          && isValidId(commentId)
+          && isValidTaskComment(incoming(), taskId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
+          && (
+            (isAdmin() && incoming().authorRole == 'admin')
+            || (
+              isActiveUser()
+              && incoming().authorRole == 'employee'
+              && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedTo == request.auth.uid
+            )
+          );
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(taskId) && isValidId(commentId) && isAdmin();
+      }
+    }
+
+    // Per-user Notifications
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && existing().recipientId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().read == false
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/users/$(incoming().recipientId))
+        && (
+          isAdmin()
+          || (
+            isActiveUser()
+            && incoming().taskId != ''
+            && exists(/databases/$(database)/documents/tasks/$(incoming().taskId))
+            && get(/databases/$(database)/documents/tasks/$(incoming().taskId)).data.assignedTo == request.auth.uid
+            && get(/databases/$(database)/documents/tasks/$(incoming().taskId)).data.createdBy == incoming().recipientId
+          )
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && existing().recipientId == request.auth.uid
+        && incoming().recipientId == existing().recipientId
+        && incoming().actorId == existing().actorId
+        && incoming().taskId == existing().taskId
+        && incoming().title == existing().title
+        && incoming().message == existing().message
+        && incoming().type == existing().type
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+
+      allow delete: if isSignedIn()
+        && isValidId(notificationId)
+        && existing().recipientId == request.auth.uid
+        && existing().read == true;
+    }
+
+    // Task Activity Audit History
+    match /taskActivities/{activityId} {
+      allow get: if isSignedIn()
+        && isValidId(activityId)
+        && (
+          existing().assignedTo == request.auth.uid
+          || existing().taskOwnerId == request.auth.uid
+          || isAdmin()
+        );
+      allow list: if isSignedIn()
+        && (
+          resource.data.assignedTo == request.auth.uid
+          || resource.data.taskOwnerId == request.auth.uid
+          || isAdmin()
+        );
+
+      allow create: if isSignedIn()
+        && isValidId(activityId)
+        && isValidTaskActivity(incoming())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/tasks/$(incoming().taskId))
+        && incoming().taskOwnerId == get(/databases/$(database)/documents/tasks/$(incoming().taskId)).data.createdBy
+        && (
+          isAdmin()
+          || (
+            isActiveUser()
+            && get(/databases/$(database)/documents/tasks/$(incoming().taskId)).data.assignedTo == request.auth.uid
+          )
+        );
+
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(activityId) && isAdmin();
+    }
+  }
+}

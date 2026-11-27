@@ -1,0 +1,410 @@
+{
+  "entities": {
+    "WorkspaceMeta": {
+      "title": "WorkspaceMeta",
+      "description": "Singleton marker indicating initial administrator bootstrap is complete.",
+      "type": "object",
+      "properties": {
+        "adminInitialized": {
+          "type": "boolean",
+          "description": "True once the first administrator account has been initialized."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when workspace was initialized."
+        }
+      },
+      "required": ["adminInitialized", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "TaskFlow user profile and role record keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID matching the document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Unique human-readable account code (e.g. ADM-001, EMP-001).",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full display name of the administrator or employee.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Work email address associated with Firebase Auth.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "role": {
+          "type": "string",
+          "description": "Access control role.",
+          "enum": ["admin", "employee"]
+        },
+        "department": {
+          "type": "string",
+          "description": "Organizational department.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "designation": {
+          "type": "string",
+          "description": "Job title or designation.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "joiningDate": {
+          "type": "string",
+          "format": "date",
+          "description": "YYYY-MM-DD joining date.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "status": {
+          "type": "string",
+          "description": "Account activation status.",
+          "enum": ["Active", "Inactive"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of user creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": [
+        "uid",
+        "employeeId",
+        "name",
+        "email",
+        "role",
+        "department",
+        "designation",
+        "joiningDate",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Company task assigned by an administrator to an employee.",
+      "type": "object",
+      "properties": {
+        "taskCode": {
+          "type": "string",
+          "description": "Sequential task identifier (e.g. TSK-001).",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Task title.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed task instructions and deliverables.",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "Firebase Auth UID of the assigned employee, or empty string if unassigned.",
+          "maxLength": 128
+        },
+        "assignedToName": {
+          "type": "string",
+          "description": "Cached display name of the assigned employee.",
+          "maxLength": 100
+        },
+        "assignedEmployeeCode": {
+          "type": "string",
+          "description": "Cached employee code of the assigned employee.",
+          "maxLength": 32
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Firebase Auth UID of the administrator who created the task.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Task priority level.",
+          "enum": ["Low", "Medium", "High"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Current execution status.",
+          "enum": ["To Do", "In Progress", "Review", "Blocked", "Completed"]
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date",
+          "description": "YYYY-MM-DD start date.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "YYYY-MM-DD due date.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "progress": {
+          "type": "number",
+          "description": "Completion percentage from 0 to 100."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of task creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last task modification."
+        }
+      },
+      "required": [
+        "taskCode",
+        "title",
+        "description",
+        "assignedTo",
+        "assignedToName",
+        "assignedEmployeeCode",
+        "createdBy",
+        "priority",
+        "status",
+        "startDate",
+        "dueDate",
+        "progress",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TaskComment": {
+      "title": "TaskComment",
+      "description": "Progress comment posted on a task by its assigned employee or an administrator.",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Parent task document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the comment author.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Display name of the comment author.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "authorRole": {
+          "type": "string",
+          "description": "Role of the comment author.",
+          "enum": ["admin", "employee"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Comment body text.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when comment was created."
+        }
+      },
+      "required": [
+        "taskId",
+        "authorId",
+        "authorName",
+        "authorRole",
+        "message",
+        "createdAt"
+      ]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Task activity notification targeted to a specific recipient user UID.",
+      "type": "object",
+      "properties": {
+        "recipientId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the notification recipient.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "taskId": {
+          "type": "string",
+          "description": "Related task document ID (or empty string).",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Short notification heading.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable notification text.",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "type": {
+          "type": "string",
+          "description": "Notification event type.",
+          "enum": ["task_assigned", "task_updated", "task_comment", "status_changed"]
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the recipient has read this notification."
+        },
+        "actorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user who triggered the event.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of notification creation."
+        }
+      },
+      "required": [
+        "recipientId",
+        "taskId",
+        "title",
+        "message",
+        "type",
+        "read",
+        "actorId",
+        "createdAt"
+      ]
+    },
+    "TaskActivity": {
+      "title": "TaskActivity",
+      "description": "Immutable audit history entry for task lifecycle actions.",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Parent task document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "Assigned employee UID on the task at event time, or empty string.",
+          "maxLength": 128
+        },
+        "taskOwnerId": {
+          "type": "string",
+          "description": "Administrator UID who owns the task.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the acting user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorName": {
+          "type": "string",
+          "description": "Display name of the acting user.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "action": {
+          "type": "string",
+          "description": "Description of the task lifecycle event.",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the activity entry."
+        }
+      },
+      "required": [
+        "taskId",
+        "assignedTo",
+        "taskOwnerId",
+        "actorId",
+        "actorName",
+        "action",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/meta/{docId}": {
+      "schema": { "$ref": "#/entities/WorkspaceMeta" },
+      "description": "Workspace initialization lock document (`workspace`)."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and RBAC role records keyed by Firebase Auth UID."
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Company tasks created by administrators and assigned to employees."
+    },
+    "/tasks/{taskId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/TaskComment" },
+      "description": "Subcollection of task progress comments."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Per-user real-time notifications."
+    },
+    "/taskActivities/{activityId}": {
+      "schema": { "$ref": "#/entities/TaskActivity" },
+      "description": "Immutable task audit trail records."
+    }
+  }
+}
